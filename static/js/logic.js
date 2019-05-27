@@ -29,15 +29,50 @@ function createMap(earthquakeLocations) {
     L.control.layers(baseMaps, overlayMaps, {
         collapsed: false
     }).addTo(map);
+
+    // Create a legend to display information about our map
+    const info = L.control({
+        position: "bottomright"
+    });
+
+    // When the layer control is added, insert a div with the class of "legend"
+    info.onAdd = function() {
+        const div = L.DomUtil.create("div", "legend");
+        return div;
+    };
+    // Add the info legend to the map
+    info.addTo(map);
+    
+    
 }
 
+const magRange = ['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '8-9', '9-10','10+'];
+const   colors = [ "#006837","#1a9850", "#66bd63", "#a6d96a", "#d9ef8b",
+                "#ffffbf", "#fee08b", "#fdae61", "#f46d43","#d73027",
+                   "#a50026"]
+
+function createLegend(){
+
+    legend = document.querySelector(".legend")
+
+    for (i = 0; i < magRange.length; i++) {
+        var magnitude = magRange[i];
+        var color = colors[i];
+        var item = document.createElement('div');
+        var key = document.createElement('span');
+        key.className = 'legend-key';
+        key.style.backgroundColor = color;
+      
+        var value = document.createElement('span');
+        value.innerHTML = magnitude;
+        item.appendChild(key);
+        item.appendChild(value);
+        legend.appendChild(item);
+      }
+}
 
 function createCircles(response) {
-    colors = [ "#a50026", "#d73027", "#f46d43", "#fdae61", 
-                "#fee08b", "#d9ef8b", "#a6d96a", "#66bd63"
-                ,"#1a9850", "#006837"]
 
-    
     const earthquakes = response.features;
 
     // Loop through the stations array
@@ -52,7 +87,7 @@ function createCircles(response) {
 
         const earthquake = L.circle(coord, {
             color: "black", //colors[ 10 - Math.round(magnitude)],
-            fillColor: colors[ 10 - Math.round(magnitude)],
+            fillColor: colors[ Math.round(magnitude)],
             stroke: false,
             fillOpacity: 0.75,
             radius: (10000 * Math.round(magnitude))
@@ -63,6 +98,7 @@ function createCircles(response) {
 
     // Create a layer group made from the bike markers array, pass it into the createMap function
     createMap(L.layerGroup(locations));
+
 }
 
 
@@ -71,4 +107,7 @@ function createCircles(response) {
     const url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson"
     const response = await d3.json(url)
     createCircles(response)
+    createLegend()
+ 
 })()
+
