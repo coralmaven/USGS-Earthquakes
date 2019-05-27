@@ -1,137 +1,74 @@
-function createFeatures(earthquakeData, layertype) {
-  
-    // Define a function we want to run once for each feature in the features array
-    // Give each feature a popup describing the place and time of the earthquake
-    function onEachFeature(feature, layer) {
-        L.circle([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], {
-            fillOpacity: 0.75,
-            fillColor: "#fdbb84",
-            color: "#e34a33",
-            // Setting our circle's radius equal to the output of our markerSize function
-            // This will make our marker's size proportionate to its magnitude
-            radius: isNaN(feature.mag) ? 1 : feature.mag 
-        }).bindPopup("<h3>" + feature.properties.place + "</h3><hr><p>" + new Date(feature.properties.time) + "</p>")
-          .addTo(layers[layertype]);
+function createMap(earthquakeLocations) {
 
-        earthquakeCount[layertype]++; 
-    }
-   // Create a GeoJSON layer containing the features array on the earthquakeData object
-    // Run the onEachFeature function once for each piece of data in the array
-    const earthquakes = L.geoJSON(earthquakeData, {
-        onEachFeature: onEachFeature
+    // Create the tile layer that will be the background of our map
+    var lightmap = L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/light-v9/tiles/256/{z}/{x}/{y}?access_token={accessToken}", {
+        attribution: "Map data &copy; <a href=\"http://openstreetmap.org\">OpenStreetMap</a> contributors, <a href=\"http://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, Imagery © <a href=\"http://mapbox.com\">Mapbox</a>",
+        maxZoom: 18,
+        id: "mapbox.light",
+        accessToken: API_KEY
     });
+
+    // Create a baseMaps object to hold the lightmap layer
+    var baseMaps = {
+        "Light Map": lightmap
+    };
+
+    // Create an overlayMaps object to hold the bikeStations layer
+    var overlayMaps = {
+        "Earthquakes": earthquakeLocations
+    };
+
+    // Create the map object with options
+    var map = L.map("map-id", {
+        center: [38.754, -122.585],
+        zoom: 5,
+        layers: [lightmap, earthquakeLocations]
+    });
+
+    // Create a layer control, pass in the baseMaps and overlayMaps. Add the layer control to the map
+    L.control.layers(baseMaps, overlayMaps, {
+        collapsed: false
+    }).addTo(map);
 }
 
 
-// Initialize all of the LayerGroups we'll be using
-const layers = {
-    PAST_HOUR: new L.LayerGroup(),
-    PAST_DAY: new L.LayerGroup(),
-    PAST_WEEK: new L.LayerGroup(),
-    PAST_MONTH: new L.LayerGroup(),
-};
+function createCircles(response) {
+    colors = [ "#a50026", "#d73027", "#f46d43", "#fdae61", 
+                "#fee08b", "#d9ef8b", "#a6d96a", "#66bd63"
+                ,"#1a9850", "#006837"]
+
+    
+    const earthquakes = response.features;
+
+    // Loop through the stations array
+    const locations = earthquakes.map(feature => {
+        // For each earthquake, create a circle and bind a popup 
+        // with the details of the earthquake
+        const magnitude = feature.properties.mag;
+        const coord = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]];
+        const popupMsg = "<h3>" + feature.properties.place + "</h3><hr>" + 
+                            "<p>"  + magnitude + "</p><hr>" +
+                            "<p>"  + new Date(feature.properties.time) + "</p>";
+
+        const earthquake = L.circle(coord, {
+            color: "black", //colors[ 10 - Math.round(magnitude)],
+            fillColor: colors[ 10 - Math.round(magnitude)],
+            stroke: false,
+            fillOpacity: 0.75,
+            radius: (10000 * Math.round(magnitude))
+         }).bindPopup(popupMsg);
+
+        return earthquake;
+    })
+
+    // Create a layer group made from the bike markers array, pass it into the createMap function
+    createMap(L.layerGroup(locations));
+}
 
 
-// Create an overlays object to add to the layer control
-const overlays = {
-    "Past Hour": layers.PAST_HOUR,
-    "Past Day": layers.PAST_DAY,
-    "Past Week": layers.PAST_WEEK,
-    "Past Month": layers.PAST_MONTH
-};
-
-// Create the map with our layers
-const map = L.map("map-id", {
-    center: [30.25, -97.76],
-    zoom: 2,
-    layers: [
-        layers.PAST_HOUR,
-        layers.PAST_DAY,
-        layers.PAST_WEEK,
-        layers.PAST_MONTH
-    ]
-});
-
-   // Define streetmap and darkmap layers
-const streetmap = L.tileLayer("https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}", {
-    attribution: "Map data &copy; <a href=\"https://www.openstreetmap.org/\">OpenStreetMap</a> contributors, <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, Imagery © <a href=\"https://www.mapbox.com/\">Mapbox</a>",
-    maxZoom: 18,
-    id: "mapbox.streets",
-    accessToken: API_KEY
-});
-
-const darkmap = L.tileLayer("https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}", {
-    attribution: "Map data &copy; <a href=\"https://www.openstreetmap.org/\">OpenStreetMap</a> contributors, <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, Imagery © <a href=\"https://www.mapbox.com/\">Mapbox</a>",
-    maxZoom: 18,
-    id: "mapbox.dark",
-    accessToken: API_KEY
-});
-
-// Define a baseMaps object to hold our base layers
-const baseMaps = {
-        "Street Map": streetmap,
-        "Dark Map": darkmap
-};
-
-// Add our 'lightmap' tile layer to the map
-streetmap.addTo(map);
-
-// Create an object to keep of the number of markers in each layer
-const earthquakeCount = {
-    PAST_HOUR: 0,
-    PAST_DAY: 0,
-    PAST_WEEK: 0,
-    PAST_MONTH: 0
-};
-
-// Create a control for our layers, add our overlay layers to it
-L.control.layers(baseMaps, overlays).addTo(map);
-
-// Create a legend to display information about our map
-const info = L.control({
-    position: "bottomright"
-});
-
-// When the layer control is added, insert a div with the class of "legend"
-info.onAdd = function() {
-    const div = L.DomUtil.create("div", "legend");
-    return div;
-};
-// Add the info legend to the map
-info.addTo(map);
-
+// Perform an API call to the Citi Bike API to get station information. Call createMarkers when complete
 (async function(){
-    const
-        past_hour_url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson",
-        past_day_url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson",
-        past_week_url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson",
-        past_month_url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson";
-
-    const pasthourRes = await d3.json(past_hour_url),
-        pastdayRes = await d3.json(past_day_url),
-        pastweekRes = await d3.json(past_week_url),
-        pastmonthRes = await d3.json(past_month_url);
-
-    createFeatures(pasthourRes.features, "PAST_HOUR"),
-    createFeatures(pastdayRes.features, "PAST_DAY"),
-    createFeatures(pastweekRes.features, "PAST_WEEK"),
-    createFeatures(pastmonthRes.features, "PAST_MONTH");
-
-    console.log(overlays)
-
-    // Call the updateLegend function, which will... update the legend!
-    updateLegend(earthquakeCount);
+    const url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson"
+    const response = await d3.json(url)
+    createCircles(response)
 })()
-
-// Update the legend's innerHTML with the last earthquake count
-function updateLegend(earthquakeCount) {
-    var today = new Date(); 
-    var time = today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds(); 
-    document.querySelector(".legend").innerHTML = [
-    "<p>Updated: " + today.toUTCString() + "</p>",
-    "<p class='past-hour'>Past Hour: " + earthquakeCount.PAST_HOUR + "</p>",
-    "<p class='past-day'>Past Day: " + earthquakeCount.PAST_DAY + "</p>",
-    "<p class='past-week'>Past Week: " + earthquakeCount.PAST_WEEK + "</p>",
-    "<p class='past-month'>Past Month: " + earthquakeCount.PAST_MONTH + "</p>",
-  ].join("");
-}
